@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <style>
         body { overscroll-behavior-y: contain; touch-action: none; background-color: #f1f5f9; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -58,7 +58,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- INICIALIZAÇÃO DO FIREBASE (SUA CHAVE AQUI) ---
+        // --- INICIALIZAÇÃO DO FIREBASE (CORRIGIDO PARA REALTIME DB) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAOYj9PajWfITTANzrxhtDYxQOmIOv4raw",
             authDomain: "meu-app-novo-c34ad.firebaseapp.com",
@@ -69,8 +69,8 @@
             appId: "1:885326202106:web:e949de044f7935986e3543"
         };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const docRef = db.collection('procoach_app').doc('master_data');
+        const db = firebase.database();
+        const docRef = db.ref('procoach_app/master_data');
 
         // --- SISTEMA DE SINCRONIZAÇÃO EM NUVEM (CLOUD SYNC) ---
         let globalData = {};
@@ -82,20 +82,20 @@
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 const dataToSave = { ...globalData };
-                dataToSave.lastUpdated = firebase.firestore.FieldValue.serverTimestamp();
+                dataToSave.lastUpdated = firebase.database.ServerValue.TIMESTAMP;
                 
-                docRef.set(dataToSave, { merge: true })
+                docRef.update(dataToSave)
                     .then(() => {
                         const status = document.getElementById('nuvem-status');
                         if(status) {
                             status.style.display = 'block';
-                            status.style.backgroundColor = '#10b981'; // Verde
+                            status.style.backgroundColor = '#10b981'; 
                             status.innerHTML = '☁️ Salvo na Nuvem';
                             setTimeout(() => status.style.display = 'none', 2000);
                         }
                     })
                     .catch(e => console.error("Erro ao salvar na nuvem:", e));
-            }, 1500); // Salva 1.5s após você parar de digitar
+            }, 1500);
         }
 
         const useSafeStorage = (key, initialValue) => {
@@ -640,9 +640,9 @@
 
             useEffect(() => {
                 // Fica ouvindo a Nuvem em tempo real
-                const unsubscribe = docRef.onSnapshot((doc) => {
-                    if (doc.exists) {
-                        const data = doc.data();
+                const unsubscribe = docRef.on('value', (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.val();
                         
                         // Bloqueia salvamentos enquanto atualiza a tela
                         isFetchingFromCloud = true;
@@ -695,7 +695,7 @@
                     if (loader) loader.style.display = 'none';
                 });
 
-                return () => unsubscribe();
+                return () => docRef.off('value', unsubscribe);
             }, []);
 
             const handleAddToSession = (libItem) => { setSessionDrills(prev => [...prev, { ...libItem, id: Date.now() }]); };
