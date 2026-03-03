@@ -33,10 +33,6 @@
         .dark-theme .text-slate-500, .dark-theme .text-slate-400 { color: #94a3b8 !important; }
         .dark-theme input, .dark-theme select, .dark-theme textarea { background-color: #0f172a !important; color: #f8fafc !important; border-color: #334155 !important; }
         .dark-theme .grass-pattern { background-color: #15803d !important; }
-        .dark-theme .bg-green-50 { background-color: #064e3b !important; border-color: #047857 !important; color: #34d399 !important; }
-        .dark-theme .bg-red-50 { background-color: #450a0a !important; border-color: #7f1d1d !important; color: #f87171 !important; }
-        .dark-theme .bg-yellow-50 { background-color: #422006 !important; border-color: #78350f !important; color: #fbbf24 !important; }
-        .dark-theme .bg-blue-50 { background-color: #172554 !important; border-color: #1e3a8a !important; color: #60a5fa !important; }
         
         /* LOGIN SAAS BRANCO */
         .login-bg { background-color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; width: 100vw; position: fixed; z-index: 100000; left:0; top:0;}
@@ -55,23 +51,26 @@
     </style>
 </head>
 <body>
+    <div id="nuvem-status" style="position: fixed; top: 0; left: 0; right: 0; background: #10b981; color: white; text-align: center; padding: 6px; font-size: 12px; font-weight: bold; z-index: 100001; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, Component } = React;
 
-        // 1. SISTEMA ANTI-ERRO
+        // 1. SISTEMA ANTI-ERRO BLINDADO
         class ErrorBoundary extends Component {
             constructor(props) { super(props); this.state = { hasError: false, err: '' }; }
             static getDerivedStateFromError(error) { return { hasError: true, err: error.toString() }; }
             render() { 
-                if(this.state.hasError) return (
-                    <div className="p-8 text-center bg-red-50 h-screen flex flex-col items-center justify-center">
-                        <h2 className="text-2xl font-bold text-red-700 mb-2">Ops! Ocorreu um erro no sistema.</h2>
-                        <pre className="text-xs bg-red-100 p-4 rounded text-red-900 max-w-md overflow-auto mb-4">{this.state.err}</pre>
-                        <button className="bg-red-600 text-white px-6 py-2 rounded font-bold shadow" onClick={()=>{localStorage.clear(); window.location.reload();}}>Resetar Aplicativo</button>
-                    </div>
-                ); 
+                if(this.state.hasError) {
+                    return (
+                        <div className="p-8 text-center bg-red-50 h-screen flex flex-col items-center justify-center">
+                            <h2 className="text-2xl font-bold text-red-700 mb-2">Ops! Ocorreu um erro no sistema.</h2>
+                            <pre className="text-xs bg-red-100 p-4 rounded text-red-900 max-w-md overflow-auto mb-4">{this.state.err}</pre>
+                            <button className="bg-red-600 text-white px-6 py-2 rounded font-bold shadow" onClick={()=>{localStorage.clear(); window.location.reload();}}>Resetar Aplicativo</button>
+                        </div>
+                    ); 
+                }
                 return this.props.children; 
             }
         }
@@ -93,23 +92,52 @@
             storageBucket: "meu-app-novo-c34ad.firebasestorage.app"
         });
         const db = firebase.database();
-        let globalData = {}; let saveTimeout = null; let isFetching = true; let activeDocRef = null;
+        let globalData = {}; 
+        let saveTimeout = null; 
+        let isFetching = true; 
+        let activeDocRef = null;
+
+        function showCloudStatus(msg, isError = false) {
+            const st = document.getElementById('nuvem-status');
+            if(st) { 
+                st.style.display = 'block'; 
+                st.style.backgroundColor = isError ? '#ef4444' : '#10b981'; 
+                st.innerHTML = msg; 
+                if (!isError) setTimeout(()=>st.style.display='none', 2000); 
+            }
+        }
+
+        window.addEventListener('offline', () => showCloudStatus('⚠️ OFFLINE - Salvando Local', true));
+        window.addEventListener('online', () => { showCloudStatus('☁️ Sincronizando...', false); triggerSave(); });
 
         function triggerSave() {
             if (isFetching || !activeDocRef) return; 
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 if(navigator.onLine) {
-                    activeDocRef.update({ ...globalData, lastUpdated: firebase.database.ServerValue.TIMESTAMP }).catch(e => console.log(e));
+                    activeDocRef.update({ ...globalData, lastUpdated: firebase.database.ServerValue.TIMESTAMP })
+                        .then(() => { showCloudStatus('☁️ Salvo na Nuvem'); })
+                        .catch(e => showCloudStatus('⚠️ ERRO AO SALVAR', true));
+                } else { 
+                    showCloudStatus('⚠️ OFFLINE', true); 
                 }
             }, 1500); 
         }
 
         const useSafeStorage = (key, initVal) => {
             const [val, setVal] = useState(() => {
-                try { const item = localStorage.getItem(key); const v = item ? JSON.parse(item) : initVal; globalData[key]=v; return v; } catch(e){return initVal;}
+                try { 
+                    const item = localStorage.getItem(key); 
+                    const v = item ? JSON.parse(item) : initVal; 
+                    globalData[key] = v; 
+                    return v; 
+                } catch(e) { return initVal; }
             });
-            useEffect(() => { globalData[key] = val; try{localStorage.setItem(key, JSON.stringify(val));}catch(e){} triggerSave(); }, [key, val]);
+            useEffect(() => { 
+                globalData[key] = val; 
+                try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} 
+                triggerSave(); 
+            }, [key, val]);
             return [val, setVal];
         };
 
@@ -117,9 +145,6 @@
         const positions = ["Goleiro", "Zagueiro", "Lat. Dir.", "Lat. Esq.", "Volante", "Meia", "Extremo", "Atacante"];
         const activityOptions = ["Aquecimento", "Tático", "Técnico", "Físico", "Coletivo", "Bola Parada", "Recuperação", "Mini Jogo"];
         const tacticalSystems = ["4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2", "4-1-4-1"];
-        const timeOptions = Array.from({length: 26}, (_, i) => (i + 1) * 5);
-        const PREDEFINED_TAGS = [{ label: 'JOGO', color: 'bg-red-600' }, { label: 'TREINO', color: 'bg-green-600' }, { label: 'RECUPERAÇÃO', color: 'bg-blue-500' }, { label: 'ACADEMIA', color: 'bg-yellow-500' }];
-        const TACTICAL_TAGS = [{ label: 'ORG. OF', color: 'bg-emerald-500' }, { label: 'ORG. DF', color: 'bg-rose-500' }, { label: 'TRANS. OF', color: 'bg-cyan-600' }, { label: 'TRANS. DF', color: 'bg-orange-600' }];
         const themeColors = ['#1e3a8a', '#0f766e', '#b91c1c', '#a16207', '#4c1d95', '#be185d', '#111827', '#FFFFFF'];
 
         const Icon = ({ n, size=18, cls="" }) => {
@@ -137,63 +162,177 @@
                 book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
                 settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
                 printer: <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
-                plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
                 trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
                 x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
                 star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
                 link: <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>,
-                arrowUp: <><polyline points="12 19 12 5"/><polyline points="5 12 12 5 19 12"/></>,
-                arrowDown: <><polyline points="12 5 12 19"/><polyline points="19 12 12 19 5 12"/></>,
-                arrowRight: <><polyline points="5 12 19 12"/><polyline points="12 5 19 12 12 19"/></>,
                 hourglass: <path d="M21 4H3M21 20H3M16 20v-5a4 4 0 0 0-4-4 4 4 0 0 0-4 4v5M16 4v5a4 4 0 0 1-4 4 4 4 0 0 1-4-4V4"/>,
                 medkit: <><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></>,
                 alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
                 trophy: <><path d="M8 21h8m-4-9v9"/><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><path d="M7 2v16"/><path d="M17 2v16"/></>,
                 sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"/></>,
-                moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
+                arrowUp: <><polyline points="12 19 12 5"/><polyline points="5 12 12 5 19 12"/></>,
+                arrowDown: <><polyline points="12 5 12 19"/><polyline points="19 12 12 19 5 12"/></>,
+                arrowRight: <><polyline points="5 12 19 12"/><polyline points="12 5 19 12 12 19"/></>,
+                plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill={n==='star'?'currentColor':'none'} stroke={n==='star'?'none':'currentColor'} strokeWidth="2" className={cls}>{s[n]}</svg>;
         };
 
-        const StarRating = ({ value, onChange }) => ( <div className="flex gap-1">{[1,2,3,4,5].map(s => <button key={s} onClick={()=>onChange(s)} className={`star-rating ${s<=value?'text-yellow-400':'text-slate-300'}`}><Icon n="star" size={14}/></button>)}</div> );
-        
-        // --- COMPONENTES FM ---
-        const OscillationChart = ({ sessions, color }) => {
-            if(!sessions || sessions.length < 2) return <div className="h-32 flex items-center justify-center text-xs text-slate-400">Dados insuficientes.</div>;
-            const h = 100, w = 250, pad = 20; 
-            const pts = sessions.slice(-10).map((s, i, arr) => `${pad + (i / (arr.length - 1)) * (w - 2*pad)},${h - pad - ((s.rating / 5) * (h - 2*pad))}`).join(' ');
-            return ( <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-32 bg-slate-50 rounded border border-slate-100"><polyline points={pts} fill="none" stroke={color} strokeWidth="2" />{sessions.slice(-10).map((s, i, arr) => <circle key={i} cx={pad + (i / (arr.length - 1)) * (w - 2*pad)} cy={h - pad - ((s.rating / 5) * (h - 2*pad))} r="3" fill={color} /> )}</svg>);
+        const StarRating = ({ value, onChange }) => ( 
+            <div className="flex gap-1">
+                {[1,2,3,4,5].map(s => (
+                    <button key={s} onClick={()=>onChange(s)} className={`star-rating ${s<=value?'text-yellow-400':'text-slate-300'}`}>
+                        <Icon n="star" size={14}/>
+                    </button>
+                ))}
+            </div> 
+        );
+
+        // 5. MODALS ESCONDIDOS
+        const ModalConfiguracoes = ({ show, onClose, themeColor, setThemeColor, teamLogo, setTeamLogo, teamName, setTeamName, coachName, setCoachName, teamCategory, setTeamCategory, isDarkMode, setIsDarkMode }) => {
+            if (!show) return null;
+            return ( 
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print" onClick={onClose}> 
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e=>e.stopPropagation()}> 
+                        <div className="p-4 text-white flex justify-between items-center" style={{backgroundColor: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}> 
+                            <h3 className="font-bold flex items-center gap-2 text-sm"><Icon n="settings"/> CONFIGURAÇÕES</h3> 
+                            <button onClick={onClose}><Icon n="x"/></button> 
+                        </div> 
+                        <div className="p-6 max-h-[80vh] overflow-y-auto"> 
+                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase">Dados da Equipe</h4> 
+                            <div className="space-y-3 mb-6">
+                                <div><label className="text-[10px] font-bold text-slate-400">NOME DO TIME</label><input className="w-full border rounded p-2 text-xs font-bold" value={teamName||''} onChange={e=>setTeamName(e.target.value)} /></div>
+                                <div><label className="text-[10px] font-bold text-slate-400">CATEGORIA</label><input className="w-full border rounded p-2 text-xs" value={teamCategory||''} onChange={e=>setTeamCategory(e.target.value)} /></div>
+                                <div><label className="text-[10px] font-bold text-slate-400">LINK DO ESCUDO (URL)</label><input className="w-full border rounded p-2 text-xs text-blue-500" value={teamLogo||''} onChange={e=>setTeamLogo(e.target.value)} /></div>
+                            </div>
+                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase border-t pt-4">Comissão Técnica</h4>
+                            <div className="space-y-3 mb-6">
+                                <div><label className="text-[10px] font-bold text-slate-400">NOME DO TREINADOR</label><input className="w-full border rounded p-2 text-xs font-bold" value={coachName||''} onChange={e=>setCoachName(e.target.value)} /></div>
+                            </div>
+                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase border-t pt-4">Aparência do Sistema</h4> 
+                            <div className="flex gap-3 justify-center flex-wrap mb-4"> 
+                                {themeColors.map(color => ( <div key={color} className={`color-picker-swatch ${themeColor === color ? 'active' : ''}`} style={{backgroundColor: color, border: color === '#FFFFFF' ? '2px solid #e2e8f0' : ''}} onClick={() => setThemeColor(color)}></div> ))} 
+                            </div> 
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-full py-3 rounded-lg text-xs font-bold flex justify-center items-center gap-2 transition-colors ${isDarkMode ? 'bg-blue-500 text-white' : 'bg-slate-800 text-white'}`}>
+                                {isDarkMode ? <><Icon n="sun"/> MODO CLARO</> : <><Icon n="moon"/> MODO ESCURO</>}
+                            </button>
+                        </div> 
+                    </div> 
+                </div> 
+            ); 
         };
 
-        const PositionalBarChart = ({ players, color }) => {
-            if(!players || players.length === 0) return null;
-            return (
-                <div className="flex items-end justify-around h-32 gap-2 border-b border-slate-200 p-2">
-                    {players.map((p, i) => (
-                        <div key={i} className="flex flex-col items-center flex-1">
-                            <div className="text-[10px] font-bold mb-1">{p.avg}</div>
-                            <div className="w-full bg-slate-200 rounded-t-sm relative group"><div className="absolute bottom-0 left-0 right-0 rounded-t-sm transition-all" style={{height: `${(p.avg / 5) * 100}%`, backgroundColor: color}}></div></div>
-                            <div className="text-[8px] font-bold text-slate-500 mt-1 truncate w-12 text-center">{p.name}</div>
-                        </div>
-                    ))}
-                </div>
+        const SeasonStatsModal = ({ show, onClose, stats, setStats, themeColor }) => {
+            if (!show) return null;
+            const updateStat = (type, field, val) => { const n = { ...stats }; n[type][field] = parseInt(val) || 0; setStats(n); };
+            const calculatePct = (p, w, d) => { if(!p || p === 0) return 0; const points = (w * 3) + d; const maxPoints = p * 3; return ((points / maxPoints) * 100).toFixed(1); };
+            const totals = { p: ((stats.league && stats.league.p)||0) + ((stats.cup && stats.cup.p)||0) + ((stats.friendly && stats.friendly.p)||0), w: ((stats.league && stats.league.w)||0) + ((stats.cup && stats.cup.w)||0) + ((stats.friendly && stats.friendly.w)||0), d: ((stats.league && stats.league.d)||0) + ((stats.cup && stats.cup.d)||0) + ((stats.friendly && stats.friendly.d)||0), l: ((stats.league && stats.league.l)||0) + ((stats.cup && stats.cup.l)||0) + ((stats.friendly && stats.friendly.l)||0), gf: ((stats.league && stats.league.gf)||0) + ((stats.cup && stats.cup.gf)||0) + ((stats.friendly && stats.friendly.gf)||0), ga: ((stats.league && stats.league.ga)||0) + ((stats.cup && stats.cup.ga)||0) + ((stats.friendly && stats.friendly.ga)||0), };
+            const totalPct = calculatePct(totals.p, totals.w, totals.d);
+            
+            return ( 
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}> 
+                    <div className="bg-white rounded-xl w-full max-w-3xl overflow-hidden" onClick={e=>e.stopPropagation()}> 
+                        <div className="p-4 text-white flex justify-between items-center" style={{backgroundColor: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}>
+                            <h3 className="font-bold flex items-center gap-2"><Icon n="chart"/> ESTATÍSTICAS DA TEMPORADA</h3>
+                            <button onClick={onClose}><Icon n="x"/></button>
+                        </div> 
+                        <div className="p-4 overflow-x-auto">
+                            <table className="w-full text-center text-xs">
+                                <thead className="font-bold uppercase text-slate-500 bg-slate-100">
+                                    <tr><th className="p-2 text-left">Competição</th><th>Jogos</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>% Aprov.</th></tr>
+                                </thead>
+                                <tbody>
+                                    {['league', 'cup', 'friendly'].map(type => { 
+                                        const s = stats[type] || {}; const pct = calculatePct(s.p, s.w, s.d); const sg = (s.gf||0) - (s.ga||0); 
+                                        return ( 
+                                            <tr key={type} className="border-b">
+                                                <td className="p-2 text-left font-bold uppercase">{type === 'league' ? 'Camp.' : type === 'cup' ? 'Copa' : 'Amistoso'}</td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.p||0} onChange={e=>updateStat(type, 'p', e.target.value)}/></td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded bg-green-50 text-green-700 font-bold" value={s.w||0} onChange={e=>updateStat(type, 'w', e.target.value)}/></td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded bg-gray-50 text-gray-700 font-bold" value={s.d||0} onChange={e=>updateStat(type, 'd', e.target.value)}/></td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded bg-red-50 text-red-700 font-bold" value={s.l||0} onChange={e=>updateStat(type, 'l', e.target.value)}/></td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.gf||0} onChange={e=>updateStat(type, 'gf', e.target.value)}/></td>
+                                                <td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.ga||0} onChange={e=>updateStat(type, 'ga', e.target.value)}/></td>
+                                                <td className={`p-1 font-bold ${sg > 0 ? 'text-green-600' : sg < 0 ? 'text-red-600' : 'text-gray-400'}`}>{sg}</td>
+                                                <td className="p-1 font-black">{pct}%</td>
+                                            </tr> 
+                                        ) 
+                                    })}
+                                    <tr className="bg-slate-50 font-black text-slate-800 border-t-2 border-slate-200">
+                                        <td className="p-3 text-left">TOTAL</td><td>{totals.p}</td><td className="text-green-600">{totals.w}</td><td className="text-gray-600">{totals.d}</td><td className="text-red-600">{totals.l}</td><td>{totals.gf}</td><td>{totals.ga}</td><td>{(totals.gf - totals.ga)}</td><td className={`${totalPct > 60 ? 'text-green-600' : totalPct < 40 ? 'text-red-600' : 'text-blue-600'}`}>{totalPct}%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div> 
+                    </div> 
+                </div> 
             );
         };
 
-        const VerticalPitch = ({ size }) => {
-            return ( <div className="w-full h-32 rounded border border-slate-300 relative overflow-hidden flex items-center justify-center grass-pattern shadow-inner group"><svg className="absolute inset-0 w-full h-full p-2 opacity-80" viewBox="0 0 100 140" fill="none" stroke="white" strokeWidth="1.5"><rect x="5" y="5" width="90" height="130" /><line x1="5" y1="70" x2="95" y2="70" /><circle cx="50" cy="70" r="12" /><rect x="25" y="5" width="50" height="20" /><rect x="38" y="5" width="24" height="8" /><path d="M 40 25 Q 50 32 60 25" strokeLinecap="round" /><path d="M 5 10 Q 10 5 10 5" /><path d="M 90 5 Q 90 10 95 10" /><rect x="25" y="115" width="50" height="20" /><rect x="38" y="127" width="24" height="8" /><path d="M 40 115 Q 50 108 60 115" strokeLinecap="round" /><path d="M 5 130 Q 10 135 10 135" /><path d="M 95 130 Q 90 135 90 135" /></svg>{size === 'Pequeno' && <div className="absolute inset-0 flex items-center justify-center"><div className="w-[40%] h-[30%] bg-yellow-400/50 border-2 border-yellow-300 rounded shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-pulse z-10 mix-blend-overlay"></div></div>}{size === 'Médio' && <div className="absolute inset-0 flex items-center justify-center"><div className="w-[90%] h-[50%] bg-yellow-400/40 border-2 border-yellow-300 shadow-[0_0_20px_rgba(250,204,21,0.5)] animate-pulse z-10 mix-blend-overlay"></div></div>}{size === 'Grande' && <div className="absolute inset-0 bg-yellow-400/30 border-4 border-yellow-300 animate-pulse z-10 mix-blend-overlay"></div>}{!size && <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-20"><span className="text-[9px] text-white font-bold bg-black/50 px-2 rounded backdrop-blur-sm">DEFINIR ESPAÇO</span></div>}</div> );
+        const PlayerProfileModal = ({ player, playerIndex, themeColor, onClose, onUpdate, onUpdateStat, history }) => {
+            if (!player) return null;
+            
+            const playerHistory = useMemo(() => {
+                if(!history) return [];
+                return Object.keys(history).map(date => ({ date, rating: (history[date].ratings && history[date].ratings[playerIndex]) || 0 })).filter(x => x.rating > 0).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [history, playerIndex]);
+
+            return ( 
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print" onClick={onClose}> 
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden" onClick={e=>e.stopPropagation()}> 
+                        <div className="p-4 text-white flex justify-between items-center" style={{background: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}>
+                            <h3 className="font-bold uppercase">{player.name || '?'}</h3>
+                            <button onClick={onClose}><Icon n="x"/></button>
+                        </div> 
+                        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"> 
+                            <div className="flex justify-center">
+                                <div className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-slate-100 shadow">
+                                    {player.image?<img src={player.image} className="w-full h-full object-cover"/>:<Icon n="users"/>}
+                                </div>
+                            </div> 
+                            
+                            <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Link da Imagem (Nuvem)</label>
+                                <input className="w-full border rounded p-2 text-xs text-blue-500 bg-white" placeholder="https://..." value={player.image||''} onChange={e=>onUpdate('image',e.target.value)}/>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button onClick={()=>onUpdate('injured', !player.injured)} className={`flex-1 py-2 rounded-lg font-bold text-white text-xs ${player.injured?'bg-red-500':'bg-green-500'}`}>{player.injured?'NO DM':'APTO'}</button>
+                                <button onClick={()=>onUpdate('suspended', !player.suspended)} className={`flex-1 py-2 rounded-lg font-bold text-white text-xs ${player.suspended?'bg-yellow-500':'bg-slate-300'}`}>{player.suspended?'SUSPENSO':'OK'}</button>
+                            </div> 
+                            
+                            <div className="grid grid-cols-4 gap-2">
+                                <div><label className="text-[10px] font-bold text-slate-500">Idade</label><input type="number" className="w-full border-b text-center" value={player.age||''} onChange={e=>onUpdate('age',e.target.value)}/></div>
+                                <div><label className="text-[10px] font-bold text-slate-500">Altura</label><input type="number" className="w-full border-b text-center" value={player.height||''} onChange={e=>onUpdate('height',e.target.value)}/></div>
+                                <div><label className="text-[10px] font-bold text-slate-500">Peso</label><input type="number" className="w-full border-b text-center" value={player.weight||''} onChange={e=>onUpdate('weight',e.target.value)}/></div>
+                                <div><label className="text-[10px] font-bold text-slate-500">Perna</label><select className="w-full border-b bg-white text-[10px]" value={player.foot||'Destro'} onChange={e=>onUpdate('foot',e.target.value)}><option>Destro</option><option>Canhoto</option><option>Ambidestro</option></select></div>
+                            </div> 
+                            
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-500">Posição</label>
+                                <select className="w-full border-b bg-white" value={player.pos || ''} onChange={e=>onUpdate('pos',e.target.value)}>
+                                    <option value="">-</option>{positions.map(p=><option key={p} value={p}>{p}</option>)}
+                                </select>
+                            </div> 
+
+                            <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 flex gap-1"><Icon n="book" size={10}/> Contrato</label>
+                                <div className="flex gap-2">
+                                    <div className="flex-1"><label className="text-[9px] text-slate-500 font-bold">Vencimento</label><input type="date" className="w-full border rounded text-xs px-1 py-1" value={player.contractEnd || ''} onChange={e=>onUpdate('contractEnd', e.target.value)}/></div>
+                                    <div className="flex-1"><label className="text-[9px] text-slate-500 font-bold">Tipo</label><select className="w-full border rounded text-xs px-1 py-1 bg-white" value={player.contractType || 'Definitivo'} onChange={e=>onUpdate('contractType', e.target.value)}><option value="Definitivo">Definitivo</option><option value="Empréstimo">Empréstimo</option></select></div>
+                                </div>
+                            </div>
+                        </div> 
+                    </div> 
+                </div> 
+            );
         };
 
-        const RadarChart = ({ data, size = 120, color = "#3b82f6" }) => {
-            const scale = size / 2.5; const center = size / 2; 
-            const values = [data.r||0, data.g||0, data.p||0, data.a||0]; 
-            const points = values.map((val, i) => { const angle = (Math.PI / 2) * i - Math.PI / 2; return [center + Math.cos(angle) * (val * scale), center + Math.sin(angle) * (val * scale)]; });
-            return (<div className="relative flex items-center justify-center"><svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible"><circle cx={center} cy={center} r={scale} fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="2,2"/><line x1={center} y1={center - scale} x2={center} y2={center + scale} stroke="#cbd5e1" strokeWidth="1" /><line x1={center - scale} y1={center} x2={center + scale} y2={center} stroke="#cbd5e1" strokeWidth="1" /><polygon points={points.map(p => p.join(',')).join(' ')} fill={color} fillOpacity="0.3" stroke={color} strokeWidth="2" /><text x={center} y={center - scale - 10} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748b">NOTA</text><text x={center + scale + 10} y={center + 3} textAnchor="start" fontSize="9" fontWeight="bold" fill="#64748b">GOLS</text><text x={center} y={center + scale + 12} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748b">PRES</text><text x={center - scale - 10} y={center + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill="#64748b">AST</text></svg></div>);
-        };
+        // 6. AS 11 ABAS RESTAURADAS E COMPLETAS
 
-        // --- AS 11 ABAS (VIEWS COMPLETAS ORIGINAIS) ---
-
-        const DashboardView = ({ themeColor, players, setTab, teamLogo, scoutingData, teamName, teamCategory, coachName, microData, calendarData, seasonStats, openStats, notices, setNotices }) => { 
+        const DashboardView = ({ themeColor, players, setTab, teamLogo, scoutingData, microData, calendarData, header, seasonStats, openStats, notices, setNotices, teamName, teamCategory, coachName }) => { 
             const validP = safeArr(players).filter(p=>p && p.name);
             const injured = validP.filter(p => p.injured); 
             const suspended = validP.filter(p => p.suspended);
@@ -238,7 +377,7 @@
                             {mergedAg.length > 0 ? mergedAg.map((ev, i) => ( <div key={i} className={`flex items-center gap-2 p-2 rounded border ${ev.source==='micro'?'bg-slate-50 border-slate-200':'bg-blue-50 border-blue-100'}`}><span className="text-[10px] font-bold opacity-50 w-8">{ev.period==='M'?'MANHÃ':'TARDE'}</span><span className={`text-[10px] font-bold text-white px-2 rounded ${ev.color||'bg-slate-500'}`}>{ev.label||'ATIV.'}</span></div> )) : <div className="text-center text-slate-300 text-xs py-4">Livre.</div>} 
                         </div> 
                     </div> 
-                    <div className="bg-white rounded-xl shadow-sm border p-4 col-span-full"><h3 className="font-bold text-xs text-slate-400 uppercase mb-2 flex items-center gap-2"><Icon n="book"/> Alertas Contratuais (Próx. 90 dias)</h3>{expiringContracts.length > 0 ? ( <div className="flex gap-2 overflow-x-auto pb-1"> {expiringContracts.map((p,i) => ( <div key={i} className="bg-red-50 border border-red-100 rounded px-2 py-1 flex items-center gap-2 shrink-0 shadow-sm"> <div className="w-6 h-6 rounded-full bg-red-200 overflow-hidden">{p.image?<img src={p.image} className="w-full h-full object-cover"/>:<Icon n="user" size={12}/>}</div> <div> <div className="text-[10px] font-bold text-red-800">{p.name}</div> <div className="text-[8px] font-bold text-red-600 flex items-center gap-1"><Icon n="hourglass" size={8}/> Vence: {fDate(p.contractEnd)}</div> </div> </div> ))} </div> ) : <div className="text-xs text-slate-300 italic">Nenhum contrato expirando.</div>}</div>
+                    <div className="bg-white rounded-xl shadow-sm border p-4 col-span-full"><h3 className="font-bold text-xs text-slate-400 uppercase mb-2 flex items-center gap-2"><Icon n="book"/> Alertas Contratuais (Próx. 90 dias)</h3>{expiringContracts.length > 0 ? ( <div className="flex gap-2 overflow-x-auto pb-1"> {expiringContracts.map((p,i) => ( <div key={i} className="bg-red-50 border border-red-100 rounded px-2 py-1 flex items-center gap-2 shrink-0 shadow-sm"> <div className="w-6 h-6 rounded-full bg-red-200 overflow-hidden">{p.image?<img src={p.image} className="w-full h-full object-cover"/>:<Icon n="user" size={12}/>}</div> <div> <div className="text-[10px] font-bold text-red-800">{p.name}</div> <div className="text-[8px] font-bold text-red-600 flex items-center gap-1"><Icon n="hourglass" size={8}/> Vence: {fDate(p.contractEnd)}</div> </div> </div> ))} </div> ) : <div className="text-xs text-slate-300 italic">Nenhum contrato expirando em breve.</div>}</div>
                     <div className="bg-white rounded-xl shadow-sm border p-4 cursor-pointer hover:bg-slate-50 transition-all col-span-full" onClick={()=>setTab('squad')}> 
                         <div className="grid grid-cols-3 gap-4 h-32 overflow-hidden divide-x divide-slate-100"> 
                             <div className="overflow-y-auto px-2"><h3 className="font-bold text-xs text-slate-400 uppercase mb-2 flex items-center gap-1"><Icon n="trophy" size={12}/> Gols</h3>{topScorers.length > 0 ? topScorers.map((p,i)=>(<div key={i} className="flex justify-between items-center text-xs border-b py-1 border-slate-50"><span className="font-bold truncate">{p.name}</span><span className="font-black bg-yellow-100 text-yellow-700 px-1 rounded">{(p.stats && p.stats.g)||0}</span></div>)) : <div className="text-xs text-slate-300 italic">...</div>}</div>
@@ -380,7 +519,7 @@
             
             const sys = scoutingData.system;
             const tacticalDB = { "4-3-3": { text: "Formação agressiva pelos lados.", s: ["Amplitude ofensiva", "Pressão alta"], w: ["Costas dos laterais", "Contra-ataque central"] }, "4-4-2": { text: "Duas linhas de 4 sólidas.", s: ["Defesa compacta", "Dupla de ataque"], w: ["Inferioridade no meio", "Espaço entre linhas"] }, "3-5-2": { text: "Povoa o meio-campo.", s: ["Superioridade no meio", "Alas ofensivos"], w: ["Costas dos alas", "Transição lenta"] }, "4-2-3-1": { text: "Equilibrada. O Camisa 10 é o cérebro.", s: ["Meia central livre", "Laterais apoiam"], w: ["Dependência do 10", "Isolamento do atacante"] }, "5-3-2": { text: "Bloco baixo e contra-ataque.", s: ["Defesa muito sólida", "Contra-ataque rápido"], w: ["Pouca posse de bola", "Dificuldade em propor jogo"] }, "3-4-3": { text: "Muito ofensiva. Riscos altos.", s: ["Ataque com 3 homens", "Pressão pós-perda"], w: ["Defesa exposta nos lados", "Exige físico perfeito"] } }; 
-            const diag = tacticalDB[sys] || { text: "Selecione o sistema.", s:[], w:[] };
+            const diag = tacticalDB[sys] || { text: "Selecione o sistema tático para ver análise.", s:[], w:[] };
 
             return (
                 <div className="p-4 bg-slate-50 h-full overflow-y-auto">
@@ -426,7 +565,7 @@
                 <div className="flex flex-col md:flex-row h-full bg-slate-50 overflow-hidden">
                     <div className="flex-1 overflow-y-auto p-4">
                         <div className="text-white p-3 rounded-xl shadow mb-4 flex justify-between items-center" style={{background:themeColor==='#FFFFFF'?'#0f172a':themeColor}}>
-                             <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="bg-white/20 border-white/30 rounded px-2 py-1 font-bold text-sm outline-none text-white"/>
+                             <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="bg-white/20 border border-white/30 rounded px-2 py-1 font-bold text-sm outline-none text-white"/>
                              <button onClick={saveS} className="bg-green-500 px-3 py-1 rounded font-bold text-xs shadow">SALVAR SESSÃO</button>
                         </div>
                         <div className="space-y-4">
