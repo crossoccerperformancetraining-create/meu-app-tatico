@@ -17,12 +17,13 @@
         body { overscroll-behavior-y: contain; touch-action: none; background-color: #f1f5f9; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 0; }
         .glass-input { background: rgba(255,255,255,0.15); border-radius: 4px; padding: 2px 4px; color: white; outline: none; width: 100%; text-align: center; border: 1px solid rgba(255,255,255,0.1); font-weight: bold; font-size: 11px; }
         .print-card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden; position: relative; }
+        .player-select-card { display: flex; flex-direction: column; align-items: center; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.25rem; cursor: pointer; transition: all 0.3s; position: relative; }
+        .player-select-card.selected { background-color: #f0fdf4; border-color: #22c55e; box-shadow: 0 0 0 1px #22c55e; }
         .color-picker-swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 2px #e2e8f0; }
         .color-picker-swatch.active { box-shadow: 0 0 0 2px #0f172a; }
         .grass-pattern { background-color: #15803d; background-image: repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.1) 11%); }
         .micro-tag { padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; color: white; display:flex; justify-content:space-between; margin-bottom: 4px;}
         
-        #nuvem-status { position: fixed; top: 0; left: 0; right: 0; background: #10b981; color: white; text-align: center; padding: 6px; font-size: 12px; font-weight: bold; z-index: 100001; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
@@ -34,17 +35,13 @@
         .dark-theme .text-slate-500, .dark-theme .text-slate-400 { color: #94a3b8 !important; }
         .dark-theme input, .dark-theme select, .dark-theme textarea { background-color: #0f172a !important; color: #f8fafc !important; border-color: #334155 !important; }
         .dark-theme .grass-pattern { background-color: #15803d !important; }
-        .dark-theme .bg-green-50 { background-color: #064e3b !important; border-color: #047857 !important; color: #34d399 !important; }
-        .dark-theme .bg-red-50 { background-color: #450a0a !important; border-color: #7f1d1d !important; color: #f87171 !important; }
-        .dark-theme .bg-yellow-50 { background-color: #422006 !important; border-color: #78350f !important; color: #fbbf24 !important; }
-        .dark-theme .bg-blue-50 { background-color: #172554 !important; border-color: #1e3a8a !important; color: #60a5fa !important; }
         
         /* LOGIN SAAS BRANCO */
         .login-bg { background-color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; width: 100vw; position: fixed; z-index: 100000; left:0; top:0;}
         .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 400px; text-align: center; border: 1px solid #e2e8f0; margin: 15px;}
         .login-input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 15px; font-size: 14px; outline: none; background: #f8fafc; color: #334155;}
         .login-input:focus { border-color: #1e3a8a; box-shadow: 0 0 0 2px rgba(30,58,138,0.2); }
-        .btn-primary { width: 100%; background: #1e3a8a; color: white; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; transition: 0.3s; font-size: 14px;}
+        .btn-primary { width: 100%; background: #1e3a8a; color: white; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; border: none; transition: 0.3s; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;}
         .btn-primary:hover { background: #1e40af; }
 
         @media print { 
@@ -56,7 +53,6 @@
     </style>
 </head>
 <body>
-    <div id="nuvem-status"></div>
     <div id="root"></div>
 
     <script type="text/babel">
@@ -97,21 +93,13 @@
         const db = firebase.database();
         let globalData = {}; let saveTimeout = null; let isFetching = true; let activeDocRef = null;
 
-        function showCloudStatus(msg, isError = false) {
-            const st = document.getElementById('nuvem-status');
-            if(st) { st.style.display = 'block'; st.style.backgroundColor = isError ? '#ef4444' : '#10b981'; st.innerHTML = msg; if (!isError) setTimeout(()=>st.style.display='none', 2000); }
-        }
-
-        window.addEventListener('offline', () => showCloudStatus('⚠️ OFFLINE - Salvando Local', true));
-        window.addEventListener('online', () => { showCloudStatus('☁️ Sincronizando...', false); triggerSave(); });
-
         function triggerSave() {
             if (isFetching || !activeDocRef) return; 
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 if(navigator.onLine) {
-                    activeDocRef.update({ ...globalData, lastUpdated: firebase.database.ServerValue.TIMESTAMP }).then(() => { showCloudStatus('☁️ Salvo'); }).catch(e => showCloudStatus('⚠️ ERRO', true));
-                } else { showCloudStatus('⚠️ OFFLINE', true); }
+                    activeDocRef.update({ ...globalData, lastUpdated: firebase.database.ServerValue.TIMESTAMP }).catch(e => console.log(e));
+                }
             }, 1500); 
         }
 
@@ -160,13 +148,16 @@
                 alert: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
                 trophy: <><path d="M8 21h8m-4-9v9"/><path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/><path d="M7 2v16"/><path d="M17 2v16"/></>,
                 sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"/></>,
-                moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
+                wifi: <><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
+                wifiOff: <><line x1="2" y1="2" x2="22" y2="22"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M5 12.55a11 11 0 0 1 5.34-2.21"/><path d="M10.44 10.44a11 11 0 0 1 8.56 2.11"/><path d="M1.42 9a16 16 0 0 1 9.58-3.46"/><path d="M15 5.34A16 16 0 0 1 22.58 9"/><line x1="12" y1="20" x2="12.01" y2="20"/></>
             };
             return <svg width={size} height={size} viewBox="0 0 24 24" fill={n==='star'?'currentColor':'none'} stroke={n==='star'?'none':'currentColor'} strokeWidth="2" className={cls}>{s[n]}</svg>;
         };
 
         const StarRating = ({ value, onChange }) => ( <div className="flex gap-1">{[1,2,3,4,5].map(s => <button key={s} onClick={()=>onChange(s)} className={`star-rating ${s<=value?'text-yellow-400':'text-slate-300'}`}><Icon n="star" size={14}/></button>)}</div> );
         
+        // --- COMPONENTES FM ---
         const OscillationChart = ({ sessions, color }) => {
             if(!sessions || sessions.length < 2) return <div className="h-32 flex items-center justify-center text-xs text-slate-400">Dados insuficientes.</div>;
             const h = 100, w = 250, pad = 20; 
@@ -200,108 +191,8 @@
             return (<div className="relative flex items-center justify-center"><svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible"><circle cx={center} cy={center} r={scale} fill="none" stroke="#e2e8f0" strokeWidth="1" strokeDasharray="2,2"/><line x1={center} y1={center - scale} x2={center} y2={center + scale} stroke="#cbd5e1" strokeWidth="1" /><line x1={center - scale} y1={center} x2={center + scale} y2={center} stroke="#cbd5e1" strokeWidth="1" /><polygon points={points.map(p => p.join(',')).join(' ')} fill={color} fillOpacity="0.3" stroke={color} strokeWidth="2" /><text x={center} y={center - scale - 10} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748b">NOTA</text><text x={center + scale + 10} y={center + 3} textAnchor="start" fontSize="9" fontWeight="bold" fill="#64748b">GOLS</text><text x={center} y={center + scale + 12} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748b">PRES</text><text x={center - scale - 10} y={center + 3} textAnchor="end" fontSize="9" fontWeight="bold" fill="#64748b">AST</text></svg></div>);
         };
 
-        // 5. MODALS (Telas por cima)
-        const SettingsModal = ({ show, onClose, themeColor, setThemeColor, teamLogo, setTeamLogo, teamName, setTeamName, coachName, setCoachName, teamCategory, setTeamCategory, isDarkMode, setIsDarkMode }) => {
-            if (!show) return null;
-            return ( 
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print" onClick={onClose}> 
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e=>e.stopPropagation()}> 
-                        <div className="p-4 text-white flex justify-between items-center" style={{backgroundColor: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}> 
-                            <h3 className="font-bold flex items-center gap-2 text-sm"><Icon n="settings"/> CONFIGURAÇÕES</h3> 
-                            <button onClick={onClose}><Icon n="x"/></button> 
-                        </div> 
-                        <div className="p-6 max-h-[80vh] overflow-y-auto"> 
-                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase">Dados da Equipe</h4> 
-                            <div className="space-y-3 mb-6">
-                                <div><label className="text-[10px] font-bold text-slate-400">NOME DO TIME</label><input className="w-full border rounded p-2 text-xs font-bold" value={teamName||''} onChange={e=>setTeamName(e.target.value)} /></div>
-                                <div><label className="text-[10px] font-bold text-slate-400">CATEGORIA</label><input className="w-full border rounded p-2 text-xs" value={teamCategory||''} onChange={e=>setTeamCategory(e.target.value)} /></div>
-                                <div><label className="text-[10px] font-bold text-slate-400">LINK DO ESCUDO (URL)</label><input className="w-full border rounded p-2 text-xs text-blue-500" value={teamLogo||''} onChange={e=>setTeamLogo(e.target.value)} /></div>
-                            </div>
-                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase border-t pt-4">Comissão Técnica</h4>
-                            <div className="space-y-3 mb-6">
-                                <div><label className="text-[10px] font-bold text-slate-400">NOME DO TREINADOR</label><input className="w-full border rounded p-2 text-xs font-bold" value={coachName||''} onChange={e=>setCoachName(e.target.value)} /></div>
-                            </div>
-                            <h4 className="font-bold text-slate-700 mb-3 text-sm uppercase border-t pt-4">Aparência</h4> 
-                            <div className="flex gap-3 justify-center flex-wrap mb-4"> 
-                                {themeColors.map(color => ( <div key={color} className={`color-picker-swatch ${themeColor === color ? 'active' : ''}`} style={{backgroundColor: color, border: color === '#FFFFFF' ? '2px solid #e2e8f0' : ''}} onClick={() => setThemeColor(color)}></div> ))} 
-                            </div> 
-                            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-full py-3 rounded-lg text-xs font-bold flex justify-center items-center gap-2 transition-colors ${isDarkMode ? 'bg-blue-500 text-white' : 'bg-slate-800 text-white'}`}>
-                                {isDarkMode ? <><Icon n="sun"/> MODO CLARO</> : <><Icon n="moon"/> MODO ESCURO</>}
-                            </button>
-                        </div> 
-                    </div> 
-                </div> 
-            ); 
-        };
-
-        const SeasonStatsModal = ({ show, onClose, stats, setStats, themeColor }) => {
-            if (!show) return null;
-            const updateStat = (type, field, val) => { const n = { ...stats }; n[type][field] = parseInt(val) || 0; setStats(n); };
-            const calculatePct = (p, w, d) => { if(!p || p === 0) return 0; const points = (w * 3) + d; const maxPoints = p * 3; return ((points / maxPoints) * 100).toFixed(1); };
-            const totals = { p: ((stats.league && stats.league.p)||0) + ((stats.cup && stats.cup.p)||0) + ((stats.friendly && stats.friendly.p)||0), w: ((stats.league && stats.league.w)||0) + ((stats.cup && stats.cup.w)||0) + ((stats.friendly && stats.friendly.w)||0), d: ((stats.league && stats.league.d)||0) + ((stats.cup && stats.cup.d)||0) + ((stats.friendly && stats.friendly.d)||0), l: ((stats.league && stats.league.l)||0) + ((stats.cup && stats.cup.l)||0) + ((stats.friendly && stats.friendly.l)||0), gf: ((stats.league && stats.league.gf)||0) + ((stats.cup && stats.cup.gf)||0) + ((stats.friendly && stats.friendly.gf)||0), ga: ((stats.league && stats.league.ga)||0) + ((stats.cup && stats.cup.ga)||0) + ((stats.friendly && stats.friendly.ga)||0), };
-            const totalPct = calculatePct(totals.p, totals.w, totals.d);
-            return ( <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}> <div className="bg-white rounded-xl w-full max-w-3xl overflow-hidden" onClick={e=>e.stopPropagation()}> <div className="p-4 text-white flex justify-between items-center" style={{backgroundColor: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}><h3 className="font-bold flex items-center gap-2"><Icon n="chart"/> ESTATÍSTICAS DA TEMPORADA</h3><button onClick={onClose}><Icon n="x"/></button></div> <div className="p-4 overflow-x-auto"><table className="w-full text-center text-xs"><thead className="font-bold uppercase text-slate-500 bg-slate-100"><tr><th className="p-2 text-left">Competição</th><th>Jogos</th><th>V</th><th>E</th><th>D</th><th>GP</th><th>GC</th><th>SG</th><th>% Aprov.</th></tr></thead><tbody>{['league', 'cup', 'friendly'].map(type => { const s = stats[type] || {}; const pct = calculatePct(s.p, s.w, s.d); const sg = (s.gf||0) - (s.ga||0); return ( <tr key={type} className="border-b"><td className="p-2 text-left font-bold uppercase">{type === 'league' ? 'Camp.' : type === 'cup' ? 'Copa' : 'Amistoso'}</td><td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.p||0} onChange={e=>updateStat(type, 'p', e.target.value)}/></td><td className="p-1"><input type="number" className="w-10 text-center border rounded bg-green-50 text-green-700 font-bold" value={s.w||0} onChange={e=>updateStat(type, 'w', e.target.value)}/></td><td className="p-1"><input type="number" className="w-10 text-center border rounded bg-gray-50 text-gray-700 font-bold" value={s.d||0} onChange={e=>updateStat(type, 'd', e.target.value)}/></td><td className="p-1"><input type="number" className="w-10 text-center border rounded bg-red-50 text-red-700 font-bold" value={s.l||0} onChange={e=>updateStat(type, 'l', e.target.value)}/></td><td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.gf||0} onChange={e=>updateStat(type, 'gf', e.target.value)}/></td><td className="p-1"><input type="number" className="w-10 text-center border rounded" value={s.ga||0} onChange={e=>updateStat(type, 'ga', e.target.value)}/></td><td className={`p-1 font-bold ${sg > 0 ? 'text-green-600' : sg < 0 ? 'text-red-600' : 'text-gray-400'}`}>{sg}</td><td className="p-1 font-black">{pct}%</td></tr> ) })}<tr className="bg-slate-50 font-black text-slate-800 border-t-2 border-slate-200"><td className="p-3 text-left">TOTAL</td><td>{totals.p}</td><td className="text-green-600">{totals.w}</td><td className="text-gray-600">{totals.d}</td><td className="text-red-600">{totals.l}</td><td>{totals.gf}</td><td>{totals.ga}</td><td>{(totals.gf - totals.ga)}</td><td className={`${totalPct > 60 ? 'text-green-600' : totalPct < 40 ? 'text-red-600' : 'text-blue-600'}`}>{totalPct}%</td></tr></tbody></table></div> </div> </div> );
-        };
-
-        const AnalysisModal = ({ show, onClose, themeColor, players, history, currentDate }) => {
-            if (!show) return null;
-            const sessionData = (history && history[currentDate]) || { ratings: {} };
-            const ratings = sessionData.ratings || {};
-            const rankedPlayers = Object.keys(ratings).map(idx => ({ ...(players[idx]||{name:'-'}), rate: ratings[idx], idx })).filter(p => p.rate > 0).sort((a, b) => b.rate - a.rate);
-            const top5 = rankedPlayers.slice(0, 5);
-            const bottom5 = [...rankedPlayers].sort((a, b) => a.rate - b.rate).slice(0, 5);
-            return ( <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={onClose}> <div className="bg-white rounded-xl w-full max-w-lg overflow-hidden" onClick={e=>e.stopPropagation()}> <div className="p-4 flex justify-between items-center text-white" style={{background: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}><h3 className="font-bold flex items-center gap-2"><Icon n="chart"/> Análise da Sessão ({formatDateBR(currentDate)})</h3><button onClick={onClose}><Icon n="x"/></button></div> <div className="p-4 grid grid-cols-2 gap-4"> <div className="bg-green-50 rounded-xl p-3 border border-green-100"><h4 className="font-black text-green-700 uppercase text-xs mb-2 flex items-center gap-1"><Icon n="trend" className="rotate-0"/> TOP 5 (Melhores)</h4>{top5.length > 0 ? top5.map((p, i) => (<div key={i} className="flex justify-between items-center border-b border-green-200 py-1 last:border-0"><span className="text-xs font-bold text-slate-700 truncate w-24">{p.name || '?'}</span><div className="flex gap-1 items-center bg-white px-1.5 rounded shadow-sm"><span className="font-black text-green-600 text-xs">{p.rate}</span><Icon n="star" size={10} className="text-yellow-400"/></div></div>)) : <span className="text-xs text-slate-400 italic">Sem dados.</span>}</div> <div className="bg-red-50 rounded-xl p-3 border border-red-100"><h4 className="font-black text-red-700 uppercase text-xs mb-2 flex items-center gap-1"><Icon n="trend" className="rotate-180"/> BOTTOM 5 (Atenção)</h4>{bottom5.length > 0 ? bottom5.map((p, i) => (<div key={i} className="flex justify-between items-center border-b border-red-200 py-1 last:border-0"><span className="text-xs font-bold text-slate-700 truncate w-24">{p.name || '?'}</span><div className="flex gap-1 items-center bg-white px-1.5 rounded shadow-sm"><span className="font-black text-red-600 text-xs">{p.rate}</span><Icon n="star" size={10} className="text-yellow-400"/></div></div>)) : <span className="text-xs text-slate-400 italic">Sem dados.</span>}</div> </div> </div> </div> );
-        };
-
-        const PlayerProfileModal = ({ player, playerIndex, themeColor, onClose, onUpdate, onUpdateStat, history }) => {
-            if (!player) return null;
-            const toggleAttr = (attr) => { const current = safeArr(player.attributes); if (current.includes(attr)) onUpdate('attributes', current.filter(a => a !== attr)); else onUpdate('attributes', [...current, attr]); };
-            const isAttr = (attr) => safeArr(player.attributes).includes(attr);
-            const playerHistory = useMemo(() => {
-                if(!history) return [];
-                return Object.keys(history).map(date => ({ date, rating: (history[date].ratings && history[date].ratings[playerIndex]) || 0 })).filter(x => x.rating > 0).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [history, playerIndex]);
-
-            return ( 
-                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm no-print" onClick={onClose}> 
-                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden" onClick={e=>e.stopPropagation()}> 
-                        <div className="p-4 text-white flex justify-between items-center" style={{background: themeColor === '#FFFFFF' ? '#0f172a' : themeColor}}>
-                            <h3 className="font-bold uppercase">{player.name || '?'}</h3>
-                            <button onClick={onClose}><Icon n="x"/></button>
-                        </div> 
-                        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto"> 
-                            <div className="flex justify-center">
-                                <div className="w-24 h-24 rounded-full bg-slate-200 overflow-hidden border-4 border-slate-100 shadow">
-                                    {player.image?<img src={player.image} className="w-full h-full object-cover"/>:<Icon n="users"/>}
-                                </div>
-                            </div> 
-                            <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Link da Imagem (Nuvem)</label>
-                                <input className="w-full border rounded p-2 text-xs text-blue-500 bg-white" placeholder="https://..." value={player.image||''} onChange={e=>onUpdate('image',e.target.value)}/>
-                            </div>
-                            <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block text-center">Evolução e Notas</label>
-                                <OscillationChart sessions={[...playerHistory].reverse()} color={themeColor === '#FFFFFF' ? '#0f172a' : themeColor} />
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={()=>onUpdate('injured', !player.injured)} className={`flex-1 py-2 rounded-lg font-bold text-white text-xs ${player.injured?'bg-red-500':'bg-green-500'}`}>{player.injured?'NO DM':'APTO'}</button>
-                                <button onClick={()=>onUpdate('suspended', !player.suspended)} className={`flex-1 py-2 rounded-lg font-bold text-white text-xs ${player.suspended?'bg-yellow-500':'bg-slate-300'}`}>{player.suspended?'SUSPENSO':'OK'}</button>
-                            </div> 
-                            <div className="grid grid-cols-4 gap-2">
-                                <div><label className="glass-label text-slate-500">Idade</label><input type="number" className="w-full border-b text-center" value={player.age||''} onChange={e=>onUpdate('age',e.target.value)}/></div>
-                                <div><label className="glass-label text-slate-500">Altura</label><input type="number" className="w-full border-b text-center" value={player.height||''} onChange={e=>onUpdate('height',e.target.value)}/></div>
-                                <div><label className="glass-label text-slate-500">Peso</label><input type="number" className="w-full border-b text-center" value={player.weight||''} onChange={e=>onUpdate('weight',e.target.value)}/></div>
-                                <div><label className="glass-label text-slate-500">Perna</label><select className="w-full border-b bg-white text-[10px]" value={player.foot||'Destro'} onChange={e=>onUpdate('foot',e.target.value)}><option>Destro</option><option>Canhoto</option><option>Ambidestro</option></select></div>
-                            </div> 
-                            <div><label className="glass-label text-slate-500">Posição</label><select className="w-full border-b bg-white" value={player.pos || ''} onChange={e=>onUpdate('pos',e.target.value)}><option value="">-</option>{positions.map(p=><option key={p} value={p}>{p}</option>)}</select></div> 
-                        </div> 
-                    </div> 
-                </div> 
-            );
-        };
-
-        // 6. AS 11 ABAS (VIEWS ORIGINAIS DA COPA DO MUNDO)
-        const DashboardView = ({ themeColor, players, setTab, teamLogo, scoutingData, microData, calendarData, header, seasonStats, openStats, notices, setNotices, teamName, teamCategory, coachName }) => { 
+        // --- AS 11 ABAS (VIEWS) ---
+        const DashboardView = ({ themeColor, players, setTab, teamLogo, scoutingData, teamName, teamCategory, coachName, microData, calendarData, seasonStats, openStats, notices, setNotices }) => { 
             const validP = safeArr(players).filter(p=>p && p.name);
             const injured = validP.filter(p => p.injured); 
             const suspended = validP.filter(p => p.suspended);
@@ -405,7 +296,7 @@
                                 </div> 
                             );
                         })} 
-                        <button onClick={addP} className="bg-white rounded-xl shadow border border-dashed border-slate-300 p-4 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-blue-500 h-40 no-print"><Icon n="plus" size={32}/><span className="font-bold text-sm">Adicionar</span></button> 
+                        <button onClick={addP} className="bg-white rounded-xl shadow border-dashed border-2 border-slate-300 p-4 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-blue-500 h-40 no-print"><Icon n="plus" size={32}/><span className="font-bold text-sm">Adicionar</span></button> 
                     </div> 
                 </div> 
             ); 
@@ -554,39 +445,59 @@
                     </div>
                     <button onClick={()=>addE('GOL')} className="w-full bg-slate-800 text-white font-bold p-3 rounded">NOVO EVENTO DE JOGO</button>
                     <div className="mt-4 space-y-2">
-                        {safeArr(matchData.events).map((e,i)=>(<div key={i} className="bg-white p-2 border rounded text-xs font-bold">{e.time} - {e.type}</div>))}
+                        {safeArr(matchData.events).map((e,i)=>(<div key={i} className="bg-white p-2 border rounded text-xs font-bold flex justify-between">{e.time} - {e.type} <button onClick={()=>setMatchData({...matchData, events: matchData.events.filter((_,idx)=>idx!==i)})} className="text-red-400"><Icon n="trash" size={14}/></button></div>))}
                     </div>
                 </div>
             );
         };
 
-        const MicrocycleView = ({ micro, setMicro }) => (
+        const MicrocycleView = ({ microData, setMicroData, themeColor }) => {
+            const days = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM'];
+            return (
+                <div className="p-4 bg-slate-50 h-full overflow-x-auto flex gap-4">
+                    {days.map(d => (
+                        <div key={d} className="bg-white border rounded-xl w-48 shrink-0 flex flex-col overflow-hidden shadow-sm">
+                            <div className="p-2 text-center text-white font-bold text-xs" style={{background:themeColor==='#FFFFFF'?'#0f172a':themeColor}}>{d}</div>
+                            <div className="p-2 flex-1"><textarea className="w-full h-full text-xs outline-none resize-none" placeholder="Atividades..." value={safeObj(microData)[d]||''} onChange={e=>setMicroData({...microData,[d]:e.target.value})} /></div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const VisualBoardView = ({ boardHistory, setBoardHistory }) => (
             <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 text-center p-8 bg-slate-50">
-                <Icon n="grid" size={64} cls="mb-4 opacity-20" />
-                <h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Microciclo</h2><p className="text-sm">Módulo operando no cofre.</p>
+                <Icon n="image" size={64} cls="mb-4 opacity-20" /><h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Quadro Tático (Board)</h2><p className="text-sm">Ative o link das imagens da semana nas configurações.</p>
             </div>
         );
 
-        const VisualBoardView = () => (
+        const CalendarView = ({ calendarData, setCalendarData }) => (
             <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 text-center p-8 bg-slate-50">
-                <Icon n="image" size={64} cls="mb-4 opacity-20" /><h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Board</h2><p className="text-sm">Módulo operando no cofre.</p>
+                <Icon n="calendar" size={64} cls="mb-4 opacity-20" /><h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Calendário</h2><p className="text-sm">Datas salvas no Banco de Dados.</p>
             </div>
         );
 
-        const CalendarView = () => (
-            <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 text-center p-8 bg-slate-50">
-                <Icon n="calendar" size={64} cls="mb-4 opacity-20" /><h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Calendário</h2><p className="text-sm">Módulo operando no cofre.</p>
-            </div>
-        );
-
-        const LibraryView = () => (
-            <div className="flex-1 flex flex-col items-center justify-center h-full text-slate-400 text-center p-8 bg-slate-50">
-                <Icon n="book" size={64} cls="mb-4 opacity-20" /><h2 className="text-2xl font-black text-slate-700 uppercase mb-2">Biblioteca</h2><p className="text-sm">Módulo operando no cofre.</p>
-            </div>
-        );
+        const LibraryView = ({ libraryDrills, setLibraryDrills }) => {
+            const addLib = () => setLibraryDrills([...safeArr(libraryDrills), {name:'Novo', desc:''}]);
+            return (
+                <div className="p-4 bg-slate-50 h-full overflow-y-auto">
+                    <button onClick={addLib} className="bg-slate-800 text-white font-bold px-4 py-2 rounded mb-4">Adicionar Exercício</button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {safeArr(libraryDrills).map((l,i)=>(
+                            <div key={i} className="bg-white border rounded-xl p-3 shadow-sm relative">
+                                <button onClick={()=>setLibraryDrills(libraryDrills.filter((_,idx)=>idx!==i))} className="absolute top-2 right-2 text-red-400"><Icon n="trash" size={14}/></button>
+                                <input className="font-bold border-b outline-none w-3/4 mb-2" value={l.name} onChange={e=>{const n=[...libraryDrills];n[i].name=e.target.value;setLibraryDrills(n)}}/>
+                                <textarea className="w-full h-20 text-xs outline-none bg-slate-50 rounded p-1" value={l.desc} onChange={e=>{const n=[...libraryDrills];n[i].desc=e.target.value;setLibraryDrills(n)}}/>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
 
         // --- APP PRINCIPAL (SAAS ROOT) ---
         const App = () => {
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [auth, setAuth] = useState(() => localStorage.getItem('pc_auth') === 'true');
             const [email, setEmail] = useState('');
             const [pass, setPass] = useState('');
@@ -611,9 +522,20 @@
             const [seasonStats, setSeasonStats] = useSafeStorage('pc_season_stats_v2', { league: { p:0, w:0, d:0, l:0, gf:0, ga:0 } });
             const [matchData, setMatchData] = useSafeStorage('pc_match_report', {});
             const [sessionDrills, setSessionDrills] = useState([]);
+            const [libraryDrillsRaw, setLibraryDrills] = useSafeStorage('pc_library', []);
+            const [boardHistory, setBoardHistory] = useSafeStorage('pc_board_history_final', {}); 
             
             const players = safeArr(playersRaw);
             const notices = safeArr(noticesRaw);
+            const libraryDrills = safeArr(libraryDrillsRaw);
+
+            useEffect(() => {
+                const onOnline = () => setIsOnline(true);
+                const onOffline = () => setIsOnline(false);
+                window.addEventListener('online', onOnline);
+                window.addEventListener('offline', onOffline);
+                return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
+            }, []);
 
             useEffect(() => {
                 if (isDarkMode) document.body.classList.add('dark-theme');
@@ -648,6 +570,8 @@
                         chk(data.pc_notices_list, globalData.pc_notices_list, setNotices);
                         chk(data.pc_season_stats_v2, globalData.pc_season_stats_v2, setSeasonStats);
                         chk(data.pc_match_report, globalData.pc_match_report, setMatchData);
+                        chk(data.pc_library, globalData.pc_library, setLibraryDrills);
+                        chk(data.pc_board_history_final, globalData.pc_board_history_final, setBoardHistory);
 
                         setTimeout(() => { isFetching = false; }, 1000);
                         const st = document.getElementById('nuvem-status');
@@ -709,7 +633,7 @@
                     <SettingsModal show={showSettings} onClose={()=>setShowSettings(false)} themeColor={themeColor} setThemeColor={setThemeColor} teamLogo={teamLogo} setTeamLogo={setTeamLogo} teamName={teamName} setTeamName={setTeamName} coachName={coachName} setCoachName={setCoachName} teamCategory={teamCategory} setTeamCategory={setTeamCategory} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} />
                     <SeasonStatsModal show={showStatsModal} onClose={()=>setShowStatsModal(false)} stats={seasonStats} setStats={setSeasonStats} themeColor={themeColor} />
                     
-                    {/* BARRA DE TOPO */}
+                    {/* BARRA DE TOPO COM INDICADOR ONLINE/OFFLINE */}
                     <div className="bg-white border-b p-2 px-4 flex justify-between items-center shadow-sm z-30 shrink-0 h-14">
                         <div className="flex items-center gap-3">
                             {teamLogo && <img src={teamLogo} className="w-8 h-8 object-contain" />}
@@ -718,13 +642,18 @@
                             </div>
                         </div>
                         <div className="flex gap-2 items-center"> 
+                            {isOnline ? (
+                                <span className="bg-green-500 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 no-print"><div className="w-2 h-2 bg-white rounded-full animate-pulse"></div> ONLINE</span>
+                            ) : (
+                                <span className="bg-red-500 text-white text-[9px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1 no-print"><div className="w-2 h-2 bg-white rounded-full"></div> OFFLINE</span>
+                            )}
                             <button onClick={()=>window.print()} className="p-2 rounded hover:bg-slate-100 text-slate-400 no-print"><Icon n="printer"/></button>
                             <button onClick={()=>setShowSettings(true)} className="p-2 rounded hover:bg-slate-100 text-slate-400 no-print"><Icon n="settings"/></button>
                             <button onClick={()=>{localStorage.removeItem('pc_auth'); window.location.reload();}} className="text-[10px] font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-3 py-1.5 rounded-lg no-print shadow-sm uppercase ml-2">Sair</button>
                         </div>
                     </div>
 
-                    {/* AS 11 ABAS */}
+                    {/* AS 11 ABAS RESTAURADAS */}
                     <div className="flex bg-white border-b gap-1 overflow-x-auto no-print shrink-0 px-2 py-1 shadow-sm" style={{scrollbarWidth:'none'}}>
                         <button onClick={()=>setTab('dashboard')} className={`px-4 py-2 rounded-lg text-[10px] uppercase font-bold shrink-0 flex flex-col items-center gap-1 transition-all ${tab==='dashboard'?'bg-slate-100 text-blue-600 shadow-inner':'text-slate-400 hover:bg-slate-50'}`}><Icon n="home" size={14}/> INÍCIO</button>
                         <button onClick={()=>setTab('squad')} className={`px-4 py-2 rounded-lg text-[10px] uppercase font-bold shrink-0 flex flex-col items-center gap-1 transition-all ${tab==='squad'?'bg-slate-100 text-blue-600 shadow-inner':'text-slate-400 hover:bg-slate-50'}`}><Icon n="users" size={14}/> PLANTEL</button>
@@ -747,10 +676,10 @@
                         {tab === 'scouting' && <ScoutingView themeColor={themeColor} scoutingData={scoutingData} setScoutingData={setScoutingData} />}
                         {tab === 'session' && <SessionView drills={sessionDrills} setDrills={setSessionDrills} players={playersRaw} history={sessionHistory} setHistory={setSessionHistory} themeColor={themeColor} />}
                         {tab === 'postmatch' && <PostMatchView matchData={matchData} setMatchData={setMatchData} players={playersRaw} />}
-                        {tab === 'micro' && <MicrocycleView />}
-                        {tab === 'board' && <VisualBoardView />}
-                        {tab === 'calendar' && <CalendarView />}
-                        {tab === 'library' && <LibraryView />}
+                        {tab === 'micro' && <MicrocycleView microData={microData} setMicroData={setMicroData} themeColor={themeColor} />}
+                        {tab === 'board' && <VisualBoardView boardHistory={boardHistory} setBoardHistory={setBoardHistory} />}
+                        {tab === 'calendar' && <CalendarView calendarData={calendarData} setCalendarData={setCalendarData} />}
+                        {tab === 'library' && <LibraryView libraryDrills={libraryDrills} setLibraryDrills={setLibraryDrills} />}
                     </div>
                 </div>
             );
